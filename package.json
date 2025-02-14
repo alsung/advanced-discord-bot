@@ -2,6 +2,7 @@
   "name": "advanced-discord-bot",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
@@ -19,6 +20,10 @@
     "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
+    "uuid": "^11.0.5",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0"
   }
 }
