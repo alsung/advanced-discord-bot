@@ -2,6 +2,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { createTask, getUserTasks, updateTask, deleteTask } from '../database/task.js';
 import { v4 as uuidv4 } from 'uuid';
+import { getOrCreateUser } from '../database/userService.js';
+
+async function test() {
+    const userId = await getOrCreateUser('123456789', 'testUser');
+    console.log('Retrieved or created user ID:', userId);
+}
+
+test();
 
 // Sample user_id for testing
 const testUser = '80d3b570-c6be-4806-8c61-d04f4039118b';
