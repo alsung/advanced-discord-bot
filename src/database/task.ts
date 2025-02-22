@@ -3,17 +3,24 @@ import { supabase } from './supabaseClient.js';
 // Task interface
 export interface Task {
     id: number;
-    user_id: string;
+    discord_id: string;
     description: string;
     assignee: string;
     created_at: string;
+    created_by: string;
 }
 
 // Create a new task
-export const createTask = async (user_id: string, description: string, assignee: string) => {
+export const createTask = async (discord_id: string, username: string, description: string, assignee_id: string, assignee_username: string) => {
     const { data, error } = await supabase
         .from('tasks')
-        .insert([{ user_id, description, assignee }])
+        .insert([{ 
+            discord_id,
+            description, 
+            assignee_id, 
+            assignee_username,
+            created_by: username
+        }])
         .select()
         .single();
 
@@ -26,11 +33,11 @@ export const createTask = async (user_id: string, description: string, assignee:
 };
 
 // Get all tasks for a specific user
-export const getUserTasks = async (user_id: string) => {
+export const getUserTasks = async (discord_id: string) => {
     const { data, error } = await supabase
         .from('tasks')
         .select('*')
-        .eq('user_id', user_id)
+        .eq('discord_id', discord_id)
         .order('created_at', { ascending: false });
 
     if (error) {

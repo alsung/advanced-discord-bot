@@ -15,12 +15,12 @@ test();
 const testUser = '80d3b570-c6be-4806-8c61-d04f4039118b';
 console.log('Test user ID:', testUser);
 const TEST_USER_ID = testUser;
-const TEST_ASSIGNEE = 'test-assignee';
+const TEST_ASSIGNEE = 'newUser';
 
 async function runTests() {
     try {
         console.log('Creating a new task...');
-        const newTask = await createTask(TEST_USER_ID, 'Test task description', TEST_ASSIGNEE);
+        const newTask = await createTask("123456789", "testUser", "Test task description", "987654321", TEST_ASSIGNEE);
         console.log('Task created:', newTask);
 
         console.log('Fetching all tasks for a user...');

@@ -3,7 +3,7 @@ import { demoteUserToMember } from "../database/user.js";
 import { supabase } from "../database/supabaseClient.js";
 
 const command = new SlashCommandBuilder()
-    .setName("denote")
+    .setName("demote")
     .setDescription("Demotes an admin back to member")
     .addUserOption(option =>
         option.setName("user")
