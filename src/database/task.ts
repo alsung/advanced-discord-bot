@@ -66,14 +66,43 @@ export const updateTask = async (task_id: number, newDescription: string) => {
 };
 
 // Delete a task
-export const deleteTask = async (task_id: number) => {
-    const { error } = await supabase
+export const deleteTask = async (discord_id: string, task_id: number) => {
+    // Fetch the task to check permissions
+    const { data: task, error: fetchError } = await supabase
+        .from("tasks")
+        .select("id, discord_id, created_by")
+        .eq("id", task_id)
+        .single();
+
+    if (fetchError || !task) {
+        console.error("Task not found or error fetching:", fetchError?.message);
+        throw new Error("Task not found");
+    }
+
+    // Check if the requester is either the task creator or an admin
+    const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("discord_id", discord_id)
+        .single();
+
+    if (userError || !user) {
+        console.error("User not found:", userError?.message);
+        throw new Error("User not found");
+    }
+
+    if (task.created_by !== discord_id && user.role !== "admin") {
+        throw new Error("You do not have permission to delete this task.");
+    }
+
+    // Delete the task
+    const { error: deleteError } = await supabase
         .from('tasks')
         .delete()
         .eq('id', task_id);
 
-    if (error) {
-        console.error('Error deleting task:', error.message);
+    if (deleteError) {
+        console.error('Error deleting task:', deleteError.message);
         throw new Error('Failed to delete task');
     }
 

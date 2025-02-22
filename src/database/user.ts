@@ -1,5 +1,4 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Retrieves an existing user by their Discord ID or creates a new user if they don't exist.
