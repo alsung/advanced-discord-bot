@@ -75,6 +75,7 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
         );
 
         console.log("Successfully registered application (/) commands.");
+        console.log(commands.map(cmd => cmd.name));
     } catch (error) {
         console.error("Error registering commands:", error);
     }
