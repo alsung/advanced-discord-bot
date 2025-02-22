@@ -50,6 +50,7 @@ for (const file of commandFiles) {
             const command = commandModule[exportName];
 
             if (command?.data && command?.execute) {
+                console.log(`Loading command: "${command.data.name}" from "${file}"`);
                 client.commands.set(command.data.name, command);
                 commands.push(command.data);
             } else {
