@@ -238,7 +238,7 @@ export const completeTask = async (discord_id: string, task_id: number) => {
     }
 
     return updatedTask;
-}
+};
 
 // Reopen a task
 export const reopenTask = async (discord_id: string, task_id: number) => {
@@ -289,4 +289,61 @@ export const reopenTask = async (discord_id: string, task_id: number) => {
     }
 
     return updatedTask;
+};
+
+// Set task status
+export const setTaskStatus = async (discord_id: string, task_id: number, newStatus: string) => {
+    // Check if the new status is allowed
+    const allowedStatuses = ["open", "in_progress", "pending_review", "completed"];
+    if (!allowedStatuses.includes(newStatus)) {
+        throw new Error("Invalid status. Allowed statuses are: open, in_progress, pending_review, completed");
+    }
+
+    // Fetch the task to check permissions
+    const { data: task, error: fetchError } = await supabase
+        .from("tasks")
+        .select("id, created_by, status")
+        .eq("id", task_id)
+        .single();
+
+    if (fetchError || !task) {
+        console.error("Task not found or error fetching:", fetchError?.message);
+        throw new Error("Task not found");
+    }
+
+    // Check if the requester is either the task creator or an admin
+    const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("discord_id", discord_id)
+        .single();
+
+    if (userError || !user) {
+        console.error("User not found:", userError?.message);
+        throw new Error("User not found");
+    }
+
+    if (task.created_by !== discord_id && user.role !== "admin") {
+        throw new Error("You do not have permission to change this task's status.");
+    }
+
+    // Update the task status
+    const { data: updatedTask, error: updateError } = await supabase
+        .from("tasks")
+        .update({ status: newStatus })
+        .eq("id", task_id)
+        .select()
+        .single();
+
+    if (updateError) {
+        console.error("Error updating task status:", updateError.message);
+        throw new Error("Failed to update task status");
+    }
+
+    return updatedTask;
+};
+
+// Show task overview
+export const getTaskOverview = async (discord_id: string) => {
+    // 
 }
