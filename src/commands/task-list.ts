@@ -17,7 +17,7 @@ async function execute(interaction: ChatInputCommandInteraction) {
             return interaction.editReply({ content: "You have no tasks assigned." });
         }
 
-        const taskList = tasks.map(task => `**#${task.id}** - ${task.description} (Assigned to: ${task.assignee_username})`).join("\n");
+        const taskList = tasks.map(task => `**#${task.id}** - ${task.description} - Status: ${task.status} (Assigned to: ${task.assignee_username})`).join("\n");
 
         await interaction.editReply({ content: `**Your Tasks:**\n${taskList}` });
     } catch (error) {

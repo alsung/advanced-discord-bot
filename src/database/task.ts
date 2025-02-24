@@ -36,7 +36,7 @@ export const createTask = async (discord_id: string, username: string, descripti
 export const getUserTasks = async (discord_id: string) => {
     const { data, error } = await supabase
         .from('tasks')
-        .select("id, description, assignee_username, created_at")
+        .select("id, description, assignee_username, created_at, status")
         .eq('discord_id', discord_id)
         .order('created_at', { ascending: false });
 
@@ -140,10 +140,10 @@ export const deleteTask = async (discord_id: string, task_id: number) => {
 
 // Update Task Assignee 
 export const updateTaskAssignee = async (discord_id: string, task_id: number, newAssigneeId: string, newAssigneeUsername: string) => {
-    // Fetch the task to check permissions
+    // Fetch the task to check permissions and current assignee
     const { data: task, error: fetchError } = await supabase
         .from("tasks")
-        .select("id, created_by")
+        .select("id, created_by, assignee_id, assignee_username")
         .eq("id", task_id)
         .single();
 
@@ -164,6 +164,15 @@ export const updateTaskAssignee = async (discord_id: string, task_id: number, ne
         throw new Error("User not found");
     }
 
+    if (task.created_by !== discord_id && user.role !== "admin") {
+        throw new Error("You do not have permission to reassign this task.");
+    }
+
+    // Check if the task is already assigned to the new assignee
+    if (task.assignee_id === newAssigneeId) {
+        throw new Error(`Task is already assigned to **${task.assignee_username}**.`);
+    }
+
     // Update the task assignee
     const { data: updatedTask, error: updateError } = await supabase
         .from("tasks")
@@ -179,3 +188,54 @@ export const updateTaskAssignee = async (discord_id: string, task_id: number, ne
 
     return updatedTask;
 };
+
+// Complete a task
+export const completeTask = async (discord_id: string, task_id: number) => {
+    // Fetch the task to check permissions and current status
+    const { data: task, error: fetchError } = await supabase
+        .from("tasks")
+        .select("id, created_by, status")
+        .eq("id", task_id)
+        .single();
+
+    if (fetchError || !task) {
+        console.error("Task not found or error fetching:", fetchError?.message);
+        throw new Error("Task not found");
+    }
+
+    // Check if the requester is either the task creator or an admin
+    const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("discord_id", discord_id)
+        .single();
+
+    if (userError || !user) {
+        console.error("User not found:", userError?.message);
+        throw new Error("User not found");
+    }
+
+    if (task.created_by !== discord_id && user.role !== "admin") {
+        throw new Error("You do not have permission to complete this task.");
+    }
+
+    // Check if task is already completed
+    if (task.status === "completed") {
+        throw new Error("Task is already marked as completed.");
+    }
+
+    // Update the status to completed
+    const { data: updatedTask, error: updateError } = await supabase
+        .from("tasks")
+        .update({ status: "completed" })
+        .eq("id", task_id)
+        .select()
+        .single();
+
+    if (updateError) {
+        console.error("Error updating task status:", updateError.message);
+        throw new Error("Failed to complete task");
+    }
+
+    return updatedTask;
+}

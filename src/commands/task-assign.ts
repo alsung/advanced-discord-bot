@@ -28,8 +28,15 @@ async function execute(interaction: ChatInputCommandInteraction) {
             content: `Task **#${updatedTask.id}** reassigned to **${newAssignee.username}**.`
         });
     } catch (error) {
-        console.error("Error reassigning task:", error);
-        await interaction.editReply({ content: "You do not have permission to reassign this task or it does not exist." });
+        // Typecast error as Error to access .message property
+        const errorMessage = (error as Error).message;
+
+        if (errorMessage.includes("already assigned to")) {
+            await interaction.editReply({ content: `${errorMessage}` });
+        } else {
+            console.error("Error reassigning task:", error);
+            await interaction.editReply({ content: "You do not have permission to reassign this task or it does not exist." });
+        }
     }
 }
 
