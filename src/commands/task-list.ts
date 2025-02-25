@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
-import { getUserTasks } from "../database/task.js";
+import { getUserTasks, Task } from "../database/task.js";
 
 const command = new SlashCommandBuilder()
     .setName("task-list")
@@ -17,7 +17,7 @@ async function execute(interaction: ChatInputCommandInteraction) {
             return interaction.editReply({ content: "You have no tasks assigned." });
         }
 
-        const taskList = tasks.map(task => `**#${task.id}** - ${task.description} - Status: ${task.status} (Assigned to: ${task.assignee_username})`).join("\n");
+        const taskList = tasks.map((task: Task) => `**#${task.id}** - ${task.description} - Status: ${task.status} (Assigned to: ${task.assignee_username})`).join("\n");
 
         await interaction.editReply({ content: `**Your Tasks:**\n${taskList}` });
     } catch (error) {

@@ -1,4 +1,6 @@
 import { supabase } from './supabaseClient.js';
+import redis from '../redisClient.js';
+import { getUsernameForLogging } from '../utils/logger.js';
 
 // Task interface
 export interface Task {
@@ -8,6 +10,9 @@ export interface Task {
     assignee: string;
     created_at: string;
     created_by: string;
+    due_date: string;
+    status: string;
+    assignee_username: string;
 }
 
 // Create a new task
@@ -29,11 +34,39 @@ export const createTask = async (discord_id: string, username: string, descripti
         throw new Error('Failed to create task');
     }
 
-    return data
+    // Get username conditionally for logging
+    const creatorName = await getUsernameForLogging(discord_id);
+    const assigneeName = await getUsernameForLogging(assignee_id);
+
+    // Invalidate cache for creator's task list and overview
+    await redis.del(`task-list:${discord_id}`);
+    await redis.del(`task-overview:${discord_id}`);
+
+    // If the task is assigned to someone else, invalidate their cache too
+    if (assignee_id !== discord_id) {
+        await redis.del(`task-list:${assignee_id}`);
+        await redis.del(`task-overview:${assignee_id}`);
+    }
+
+    console.log(`Cache invalidated for creator: ${creatorName} and assignee: ${assigneeName}`);
+    return data;
 };
 
-// Get all tasks for a specific user
+// Get all tasks for a specific user (with Redis caching)
 export const getUserTasks = async (discord_id: string) => {
+    // Get username conditionally for logging
+    const username = await getUsernameForLogging(discord_id);
+
+    const cacheKey = `task-list:${discord_id}`;
+    
+    // Check Redis cache first
+    const cachedTasks = await redis.get(cacheKey);
+    if (cachedTasks) {
+        console.log("Cache hit for task list");
+        return JSON.parse(cachedTasks);
+    }
+
+    console.log("Cache miss for task list. Fetching from DB...");
     const { data, error } = await supabase
         .from('tasks')
         .select("id, description, assignee_username, created_at, status, due_date")
@@ -45,6 +78,9 @@ export const getUserTasks = async (discord_id: string) => {
         throw new Error('Failed to fetch tasks');
     }
 
+    await redis.set(cacheKey, JSON.stringify(data), 'EX', 300); // Cache for 5 minutes
+
+    console.log(`Cached task list for ${username}`);
     return data;
 };
 
@@ -383,6 +419,9 @@ export const setTaskStatus = async (discord_id: string, task_id: number, newStat
 
 // Show task overview
 export const getTaskOverview = async (discord_id: string) => {
+    // Get username conditionally for logging
+    const username = await getUsernameForLogging(discord_id);
+
     // Check if the requester is an admin
     const { data: user, error: userError } = await supabase
         .from("users")
@@ -397,6 +436,17 @@ export const getTaskOverview = async (discord_id: string) => {
 
     // Admins see all tasks, regular users see only their tasks
     const isAdmin = user.role === "admin";
+    const cacheKey = isAdmin ? `task-overview:admin` : `task-overview:${discord_id}`;
+    
+    // Check Redis cache first
+    const cachedOverview = await redis.get(cacheKey);
+    if (cachedOverview) {
+        console.log(`Cache hit for task overview of ${username}`);
+        return JSON.parse(cachedOverview);
+    }
+
+    console.log(`Cache miss for task overview of ${username}. Fetching from DB...`);
+
     const filter = isAdmin ? {} : { assignee_id: discord_id };
 
     // Query tasks and group by status
@@ -434,8 +484,12 @@ export const getTaskOverview = async (discord_id: string) => {
         }
     });
 
+    // Cache the overview in Redis for 5 minutes
+    await redis.set(cacheKey, JSON.stringify({ overview, isAdmin }), "EX", 300);
+
+    console.log(`Cached task overview for ${isAdmin ? "admin" : username}`);
     return { overview, isAdmin };
-}
+};
 
 // Set task due date
 export const setTaskDueDate = async (discord_id: string, task_id: number, dueDate: string | null) => {

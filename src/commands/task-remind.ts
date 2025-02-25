@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
-import { getUserTasks } from "../database/task.js";
+import { getUserTasks, Task } from "../database/task.js";
 import dayjs from "dayjs";
 
 const command = new SlashCommandBuilder()
@@ -13,22 +13,22 @@ async function execute(interaction: ChatInputCommandInteraction) {
     const today = dayjs().startOf("day");
 
     try {
-        const tasks = await getUserTasks(discordId);
-        const upcomingTasks = tasks.filter(task => task.due_date && dayjs(task.due_date).isAfter(today));
-        const overdueTasks = tasks.filter(task => task.due_date && dayjs(task.due_date).isBefore(today));
+        const tasks: Task[] = await getUserTasks(discordId);
+        const upcomingTasks = tasks.filter((task: Task) => task.due_date && dayjs(task.due_date).isAfter(today));
+        const overdueTasks = tasks.filter((task: Task) => task.due_date && dayjs(task.due_date).isBefore(today));
 
         let reminderMessage = "🔔 **Task Reminders:**\n\n";
 
         if (overdueTasks.length > 0) {
             reminderMessage += `**Overdue Tasks:**\n`;
-            overdueTasks.forEach(task => {
+            overdueTasks.forEach((task: Task) => {
                 reminderMessage += `• **#${task.id}**: ${task.description} (Due: <t:${dayjs(task.due_date).unix()}:R>)\n`;
             });
         }
 
         if (upcomingTasks.length > 0) {
             reminderMessage += "\n**Upcoming Tasks:**\n";
-            upcomingTasks.forEach(task => {
+            upcomingTasks.forEach((task: Task) => {
                 reminderMessage += `• **#${task.id}**: ${task.description} (Due: <t:${dayjs(task.due_date).unix()}:R>)\n`;
             });
         }

@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from "discord.js";
-import { getTaskOverview } from "../database/task.js";
+import { getTaskOverview, Task } from "../database/task.js";
 
 // Define allowed statuses as a TypeScript type
 type TaskStatus = "open" | "in_progress" | "pending_review" | "completed";
@@ -26,7 +26,7 @@ async function execute(interaction: ChatInputCommandInteraction) {
         Object.keys(overview).forEach((status) => {
             const typedStatus = status as TaskStatus | "unknown";
             const tasks = overview[typedStatus];
-            const taskList = tasks.map(task => `• **#${task.id}**: ${task.description} (Assigned to: ${task.assignee_username})`).join("\n");
+            const taskList = tasks.map((task: Task) => `• **#${task.id}**: ${task.description} (Assigned to: ${task.assignee_username})`).join("\n");
             embed.addFields({ name: `${typedStatus.toUpperCase()} (${tasks.length})`, value: taskList || "No tasks", inline: false });
         });
 
