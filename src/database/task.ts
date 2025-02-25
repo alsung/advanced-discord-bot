@@ -345,5 +345,102 @@ export const setTaskStatus = async (discord_id: string, task_id: number, newStat
 
 // Show task overview
 export const getTaskOverview = async (discord_id: string) => {
-    // 
+    // Check if the requester is an admin
+    const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("discord_id", discord_id)
+        .single();
+
+    if (userError || !user) {
+        console.error("User not found:", userError?.message);
+        throw new Error("User not found");
+    }
+
+    // Admins see all tasks, regular users see only their tasks
+    const isAdmin = user.role === "admin";
+    const filter = isAdmin ? {} : { assignee_id: discord_id };
+
+    // Query tasks and group by status
+    const { data: tasks, error: fetchError } = await supabase
+        .from("tasks")
+        .select("id, description, status, assignee_username")
+        .match(filter)
+        .order("status", { ascending: true });
+
+    if (fetchError) {
+        console.error("Error fetching tasks:", fetchError.message);
+        throw new Error("Failed to fetch tasks");
+    }
+
+    // Define allowed statuses as a TypeScript type
+    type TaskStatus = "pending" | "open" | "in_progress" | "pending_review" | "completed";
+
+    // Group tasks by status
+    const overview: Record<TaskStatus | "unknown", any[]> = {
+        "pending": [],
+        "open": [],
+        "in_progress": [],
+        "pending_review": [],
+        "completed": [],
+        unknown: [] // Fallback for unknown statuses
+    };
+
+    // Typecast task.status to TaskStatus and handle unknowns
+    tasks.forEach(task => {
+        const status = task.status as TaskStatus;
+        if (overview[status]) {
+            overview[status].push(task);
+        } else {
+            overview.unknown.push(task);
+        }
+    });
+
+    return { overview, isAdmin };
 }
+
+// Set task due date
+export const setTaskDueDate = async (discord_id: string, task_id: number, dueDate: string | null) => {
+    // Fetch the task to check permissions
+    const { data: task, error: fetchError } = await supabase
+        .from("tasks")
+        .select("id, created_by, due_date")
+        .eq("id", task_id)
+        .single();
+
+    if (fetchError || !task) {
+        console.error("Task not found or error fetching:", fetchError?.message);
+        throw new Error("Task not found");
+    }
+
+    // Check if the requester is either the task creator or an admin
+    const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("discord_id", discord_id)
+        .single();
+
+    if (userError || !user) {
+        console.error("User not found:", userError?.message);
+        throw new Error("User not found");
+    }
+
+    if (task.created_by !== discord_id && user.role !== "admin") {
+        throw new Error("You do not have permission to change this task's due date.");
+    }
+
+    // Update the task's due date
+    const { data: updatedTask, error: updateError } = await supabase
+        .from("tasks")
+        .update({ due_date: dueDate })
+        .eq("id", task_id)
+        .select()
+        .single();
+
+    if (updateError) {
+        console.error("Error updating task due date:", updateError.message);
+        throw new Error("Failed to update task due date");
+    }
+
+    return updatedTask;
+};
