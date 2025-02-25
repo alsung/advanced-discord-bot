@@ -36,7 +36,7 @@ export const createTask = async (discord_id: string, username: string, descripti
 export const getUserTasks = async (discord_id: string) => {
     const { data, error } = await supabase
         .from('tasks')
-        .select("id, description, assignee_username, created_at, status")
+        .select("id, description, assignee_username, created_at, status, due_date")
         .eq('discord_id', discord_id)
         .order('created_at', { ascending: false });
 
