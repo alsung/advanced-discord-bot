@@ -138,6 +138,44 @@ export const deleteTask = async (discord_id: string, task_id: number) => {
     return { success: true, message: 'Task deleted' };
 };
 
+// Add all users in the server to the database
+export const addAllUsers = async(guildMembers: any) => {
+    // Fetch all existing users from the database
+    const { data: existingUsers, error: fetchError } = await supabase
+        .from("users")
+        .select("discord_id, role")
+
+    if (fetchError) {
+        console.error("Error fetching existing users:", fetchError.message);
+        throw new Error("Failed to fetch existing users");
+    }
+
+    const existingUserMap = new Map(existingUsers.map(user => [user.discord_id, user.role]));
+
+    // Create an array of users to insert or update
+    const usersToInsert = guildMembers.map((member: any) => {
+        const existingRole = existingUserMap.get(member.id);
+        console.log(`Existing role for ${member.user.username}: ${existingRole}`);
+
+        return {
+            discord_id: member.id,
+            username: member.user.username,
+            role: existingRole || "member" // Keep existing role if present, otherwise set to member
+        };
+    });
+
+    const { data, error } = await supabase
+        .from("users")
+        .upsert(usersToInsert, { onConflict: "discord_id" });
+
+    if (error) {
+        console.error("Error adding users:", error.message);
+        throw new Error("Failed to add users");
+    }
+
+    return data;
+};
+
 // Update Task Assignee 
 export const updateTaskAssignee = async (discord_id: string, task_id: number, newAssigneeId: string, newAssigneeUsername: string) => {
     // Fetch the task to check permissions and current assignee
