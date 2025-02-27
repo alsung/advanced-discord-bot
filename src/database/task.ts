@@ -38,6 +38,9 @@ export const createTask = async (discord_id: string, username: string, descripti
     const creatorName = await getUsernameForLogging(discord_id);
     const assigneeName = await getUsernameForLogging(assignee_id);
 
+    // Invalidate cache for admin
+    await redis.del(`task-overview:admin`);
+
     // Invalidate cache for creator's task list and overview
     await redis.del(`task-list:${discord_id}`);
     await redis.del(`task-overview:${discord_id}`);
@@ -84,12 +87,12 @@ export const getUserTasks = async (discord_id: string) => {
     return data;
 };
 
-// Update a task description
+// Update a task description (with Redis Caching and Invalidation)
 export const updateTask = async (discord_id: string, task_id: number, newDescription: string) => {
     // Fetch the task to check permissions
     const { data: task, error: fetchError } = await supabase
         .from("tasks")
-        .select("id, created_by")
+        .select("id, created_by, assignee_id")
         .eq("id", task_id)
         .single();
 
@@ -127,15 +130,27 @@ export const updateTask = async (discord_id: string, task_id: number, newDescrip
         throw new Error("Failed to update task");
     }
 
+    // Invalidate cache for admin
+    await redis.del(`task-overview:admin`);
+
+    // Invalidate cache for the assignee
+    await redis.del(`task-list:${task.assignee_id}`);
+    await redis.del(`task-overview:${task.assignee_id}`);
+
+    // Invalidate cache for the caller (admin or creator)
+    await redis.del(`task-list:${discord_id}`);
+    await redis.del(`task-overview:${discord_id}`);
+
+    console.log(`Cache invalidated for updated task #${task_id} by ${discord_id}`);
     return updatedTask;
 };
 
-// Delete a task
+// Delete a task (with Redis Caching and Invalidation)
 export const deleteTask = async (discord_id: string, task_id: number) => {
     // Fetch the task to check permissions
     const { data: task, error: fetchError } = await supabase
         .from("tasks")
-        .select("id, discord_id, created_by")
+        .select("id, discord_id, created_by, assignee_id")
         .eq("id", task_id)
         .single();
 
@@ -171,6 +186,18 @@ export const deleteTask = async (discord_id: string, task_id: number) => {
         throw new Error('Failed to delete task');
     }
 
+    // Invalidate cache for admin
+    await redis.del(`task-overview:admin`);
+
+    // Invalidate cache for the assignee
+    await redis.del(`task-list:${task.assignee_id}`);
+    await redis.del(`task-overview:${task.assignee_id}`);
+
+    // Invalidate cache for the caller (admin or creator)
+    await redis.del(`task-list:${discord_id}`);
+    await redis.del(`task-overview:${discord_id}`);
+
+    console.log(`Cache invalidated for deleted task #${task_id} by ${discord_id}`);
     return { success: true, message: 'Task deleted' };
 };
 
@@ -212,7 +239,7 @@ export const addAllUsers = async(guildMembers: any) => {
     return data;
 };
 
-// Update Task Assignee 
+// Update Task Assignee (with Redis Caching and Invalidation)
 export const updateTaskAssignee = async (discord_id: string, task_id: number, newAssigneeId: string, newAssigneeUsername: string) => {
     // Fetch the task to check permissions and current assignee
     const { data: task, error: fetchError } = await supabase
@@ -249,26 +276,42 @@ export const updateTaskAssignee = async (discord_id: string, task_id: number, ne
 
     // Update the task assignee
     const { data: updatedTask, error: updateError } = await supabase
-        .from("tasks")
-        .update({ assignee_id: newAssigneeId, assignee_username: newAssigneeUsername })
-        .eq("id", task_id)
-        .select()
-        .single();
-
+    .from("tasks")
+    .update({ assignee_id: newAssigneeId, assignee_username: newAssigneeUsername })
+    .eq("id", task_id)
+    .select()
+    .single();
+    
     if (updateError) {
         console.error("Error updating task assignee:", updateError.message);
         throw new Error("Failed to update task assignee");
     }
 
+    // Invalidate cache for admin
+    await redis.del(`task-overview:admin`);
+
+    // Invalidate cache for old assignee
+    await redis.del(`task-list:${task.assignee_id}`);
+    await redis.del(`task-overview:${task.assignee_id}`);
+
+    // Invalidate cache for new assignee
+    await redis.del(`task-list:${newAssigneeId}`);
+    await redis.del(`task-overview:${newAssigneeId}`);
+
+    // Invalidate cache for the caller (admin or creator)
+    await redis.del(`task-list:${discord_id}`);
+    await redis.del(`task-overview:${discord_id}`);
+
+    console.log(`Cache invalidated for reassigned task #${task_id} by ${discord_id}`);
     return updatedTask;
 };
 
-// Complete a task
+// Complete a task (with Redis caching and invalidation)
 export const completeTask = async (discord_id: string, task_id: number) => {
     // Fetch the task to check permissions and current status
     const { data: task, error: fetchError } = await supabase
         .from("tasks")
-        .select("id, created_by, status")
+        .select("id, created_by, status, assignee_id")
         .eq("id", task_id)
         .single();
 
@@ -311,15 +354,28 @@ export const completeTask = async (discord_id: string, task_id: number) => {
         throw new Error("Failed to complete task");
     }
 
+    // Invalidate cache for admins
+    await redis.del(`task-overview:admin`);
+
+    // Invalidate cache for task status
+    await redis.del(`task-status:${task_id}`);
+    await redis.del(`task-list:${task.assignee_id}`);
+    await redis.del(`task-overview:${task.assignee_id}`);
+
+    // Invalidate cache for caller (the admin or creator who completed the task)
+    await redis.del(`task-list:${task.created_by}`);
+    await redis.del(`task-overview:${task.created_by}`);
+
+    console.log(`Cache invalidated for completed task #${task_id}`);
     return updatedTask;
 };
 
-// Reopen a task
+// Reopen a task (with Redis caching and invalidation)
 export const reopenTask = async (discord_id: string, task_id: number) => {
     // Fetch the task to check permissions and current status
     const { data: task, error: fetchError } = await supabase
         .from("tasks")
-        .select("id, created_by, status")
+        .select("id, created_by, assignee_id, status")
         .eq("id", task_id)
         .single();
 
@@ -362,7 +418,52 @@ export const reopenTask = async (discord_id: string, task_id: number) => {
         throw new Error("Failed to reopen task");
     }
 
+    // Invalidate cache for admin
+    await redis.del(`task-overview:admin`);
+
+    // Invalidate cache for task status
+    await redis.del(`task-status:${task_id}`);
+    await redis.del(`task-list:${task.assignee_id}`);
+    await redis.del(`task-overview:${task.assignee_id}`);
+
+    // Invalidate cache for caller (the admin or creator who reopened the task)
+    await redis.del(`task-list:${task.created_by}`);
+    await redis.del(`task-overview:${task.created_by}`);
+    await redis.del(`task-list:${discord_id}`);
+    await redis.del(`task-overview:${discord_id}`);
+
+    console.log(`Cache invalidated for reopened task #${task_id}`);
     return updatedTask;
+};
+
+// Get task status (with Redis caching)
+export const getTaskStatus = async (task_id: number) => {
+    const cacheKey = `task-status:${task_id}`;
+
+    // Check Redis cache first
+    const cachedStatus = await redis.get(cacheKey);
+    if (cachedStatus) {
+        console.log(`Cache hit for task status of task #${task_id}`);
+        return JSON.parse(cachedStatus);
+    }
+
+    console.log(`Cache miss for task status of task #${task_id}. Fetching from DB...`);
+    const { data: task, error } = await supabase
+        .from("tasks")
+        .select("id, description, status, assignee_username")
+        .eq("id", task_id)
+        .single();
+
+    if (error || !task) {
+        console.error("Error getting task status:", error?.message);
+        throw new Error("Task not found");
+    }
+
+    // Cache the task status in Redis for 5 minutes
+    await redis.set(cacheKey, JSON.stringify(task), "EX", 300);
+
+    console.log(`Cached task status for task #${task_id}`);
+    return task;
 };
 
 // Set task status
@@ -376,7 +477,7 @@ export const setTaskStatus = async (discord_id: string, task_id: number, newStat
     // Fetch the task to check permissions
     const { data: task, error: fetchError } = await supabase
         .from("tasks")
-        .select("id, created_by, status")
+        .select("id, created_by, assignee_id, status")
         .eq("id", task_id)
         .single();
 
@@ -384,6 +485,9 @@ export const setTaskStatus = async (discord_id: string, task_id: number, newStat
         console.error("Task not found or error fetching:", fetchError?.message);
         throw new Error("Task not found");
     }
+
+    // Get username for better logging
+    const username = await getUsernameForLogging(discord_id);
 
     // Check if the requester is either the task creator or an admin
     const { data: user, error: userError } = await supabase
@@ -414,6 +518,21 @@ export const setTaskStatus = async (discord_id: string, task_id: number, newStat
         throw new Error("Failed to update task status");
     }
 
+    // Invalidate cache for admin
+    await redis.del(`task-overview:admin`);
+
+    // Invalidate cache for task status
+    await redis.del(`task-status:${task_id}`);
+
+    // Invalidate related task lists and overviews
+    await redis.del(`task-list:${task.assignee_id}`);
+    await redis.del(`task-overview:${task.assignee_id}`);
+
+    // Invalidate cache for the caller (admin or creator)
+    await redis.del(`task-list:${task.created_by}`);
+    await redis.del(`task-overview:${task.created_by}`);
+
+    console.log(`Cache invalidated for task #${task_id} by ${username}`);
     return updatedTask;
 };
 
@@ -491,12 +610,12 @@ export const getTaskOverview = async (discord_id: string) => {
     return { overview, isAdmin };
 };
 
-// Set task due date
+// Set task due date (with Redis caching and invalidation)
 export const setTaskDueDate = async (discord_id: string, task_id: number, dueDate: string | null) => {
     // Fetch the task to check permissions
     const { data: task, error: fetchError } = await supabase
         .from("tasks")
-        .select("id, created_by, due_date")
+        .select("id, created_by, due_date, assignee_id")
         .eq("id", task_id)
         .single();
 
@@ -504,6 +623,9 @@ export const setTaskDueDate = async (discord_id: string, task_id: number, dueDat
         console.error("Task not found or error fetching:", fetchError?.message);
         throw new Error("Task not found");
     }
+
+    // Get username for better logging
+    const username = await getUsernameForLogging(discord_id);
 
     // Check if the requester is either the task creator or an admin
     const { data: user, error: userError } = await supabase
@@ -533,6 +655,22 @@ export const setTaskDueDate = async (discord_id: string, task_id: number, dueDat
         console.error("Error updating task due date:", updateError.message);
         throw new Error("Failed to update task due date");
     }
+
+    // Cache Invalidation
+    console.log(`Invalidating cache for task due date change by ${username}`);
+
+    // Invalidate cache for admin
+    await redis.del(`task-overview:admin`);
+
+    // Invalidate cache for Assignee (if present)
+    if (task.assignee_id) {
+        await redis.del(`task-list:${task.assignee_id}`);
+        await redis.del(`task-overview:${task.assignee_id}`);
+    }
+
+    // Invalidate cache for creator
+    await redis.del(`task-list:${task.created_by}`);
+    await redis.del(`task-overview:${task.created_by}`);
 
     return updatedTask;
 };

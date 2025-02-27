@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:6.2-alpine
+    container_name: advanced-discord-bot-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - discord-network
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: advanced-discord-bot-bot
+    restart: always
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DEBUG_MODE=true
+    depends_on:
+      - redis
+    networks:
+      - discord-network
+
+networks:
+  discord-network:
+    driver: bridge

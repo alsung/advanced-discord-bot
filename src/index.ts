@@ -9,7 +9,7 @@ import { ExtendedClient } from './types/client.js';
 import { supabase } from './database/supabaseClient.js';
 
 // Load environment variables from .env
-dotenv.config();
+dotenv.config({ path: process.env.NODE_ENV === "production" ? ".env.production" : ".env" });
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
