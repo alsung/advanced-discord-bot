@@ -1,5 +1,0 @@
-[install]
-path = "./node_modules"
-
-[test]
-run = "bun test"
