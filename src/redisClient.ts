@@ -1,12 +1,13 @@
-import { Redis } from "ioredis";
+// src/redisClient.ts
+import Redis from "ioredis";
+import type { Redis as RedisClientType } from "ioredis";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const redis = new Redis({
-    host: process.env.REDIS_HOST || "redis",
-    port: Number(process.env.REDIS_PORT) || 6379,
-    password: process.env.REDIS_PASSWORD || undefined
+// Use 'unknown' type assertion and cast to RedisClientType
+const redis = new (Redis as unknown as { new (...args: any[]): RedisClientType })(process.env.REDIS_URL!, {
+    tls: process.env.REDIS_URL?.includes("rediss://") ? {} : undefined, // Enable TLS if using rediss://
 });
 
 redis.on("connect", () => console.log("Connected to Redis"));
