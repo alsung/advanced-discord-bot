@@ -14,9 +14,6 @@ dotenv.config({ path: process.env.NODE_ENV === "production" ? ".env.production" 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 
-console.log("TOKEN:", TOKEN);
-console.log("CLIENT_ID:", CLIENT_ID);
-
 if (!TOKEN || !CLIENT_ID) {
     console.error('Missing environment variables in .env');
     process.exit(1);
